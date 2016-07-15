@@ -4,6 +4,7 @@ import java.sql.SQLNonTransientException;
 import java.sql.SQLSyntaxErrorException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +26,7 @@ import io.mycat.route.parser.druid.MycatSchemaStatVisitor;
 import io.mycat.route.parser.druid.RouteCalculateUnit;
 import io.mycat.route.util.RouterUtil;
 import io.mycat.server.parser.ServerParse;
+import io.mycat.sql.dialect.mysql.insert.PartionKeyUpdateHandlerFactory;
 import io.mycat.util.StringUtil;
 
 public class DruidInsertParser extends DefaultDruidParser {
@@ -188,14 +190,22 @@ public class DruidInsertParser extends DefaultDruidParser {
 		//such as :INSERT INTO TABLEName (a,b,c) VALUES (1,2,3) ON DUPLICATE KEY UPDATE b=VALUES(b); 
 		//INSERT INTO TABLEName (a,b,c) VALUES (1,2,3) ON DUPLICATE KEY UPDATE c=c+1;
 		if(insertStmt.getDuplicateKeyUpdate() != null) {
-			List<SQLExpr> updateList = insertStmt.getDuplicateKeyUpdate();
-			for(SQLExpr expr : updateList) {
-				SQLBinaryOpExpr opExpr = (SQLBinaryOpExpr)expr;
+//			List<SQLExpr> updateList = insertStmt.getDuplicateKeyUpdate();
+//			for(SQLExpr expr : updateList) {
+//				SQLBinaryOpExpr opExpr = (SQLBinaryOpExpr)expr;
+//				String column = StringUtil.removeBackquote(opExpr.getLeft().toString().toUpperCase());
+//				if(column.equals(partitionColumn)) {
+//					String msg = "partion key can't be updated: " + tableName + " -> " + partitionColumn;
+//					LOGGER.warn(msg);
+//					throw new SQLNonTransientException(msg);
+//				}
+//			}
+			Iterator<SQLExpr> it = insertStmt.getDuplicateKeyUpdate().iterator();
+			while (it.hasNext()) {
+				SQLBinaryOpExpr opExpr = (SQLBinaryOpExpr) it.next();
 				String column = StringUtil.removeBackquote(opExpr.getLeft().toString().toUpperCase());
 				if(column.equals(partitionColumn)) {
-					String msg = "partion key can't be updated: " + tableName + " -> " + partitionColumn;
-					LOGGER.warn(msg);
-					throw new SQLNonTransientException(msg);
+					PartionKeyUpdateHandlerFactory.createHandler().handle(it, tableName, partitionColumn);
 				}
 			}
 		}
